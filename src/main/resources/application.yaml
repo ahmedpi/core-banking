@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: core-banking
+
+  datasource:
+    url: jdbc:sqlserver://localhost:1433;databaseName=master;encrypt=true;trustServerCertificate=true;
+    username: SA
+    password: Password123
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # Ensures your code matches the exact state of the database
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.SQLServerDialect
+
+  flyway:
+    enabled: true
+    # 3. Inform Flyway to automatically execute a CREATE DATABASE catalog call if missing
+    create-schemas: true
+    # 4. Explicitly tell Flyway which specific schema catalog inside SQL Server it must manage
+    schemas: finflow
+    # 5. Point Flyway to look inside your source migration directory path
+    locations: classpath:db/migration
