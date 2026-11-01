@@ -57,6 +57,29 @@ Verify the container is active and listening on port `1433`:
 docker ps
 ```
 
+### 🔍 Local Database Troubleshooting & Verification
+If your container environment lacks a default native client command path line utility, spin up an ad-hoc proxy container to query the relational engine:
+
+1. Launch a network-bridged container instance:
+   ```powershell
+   docker run -it --rm --network core-banking_default ubuntu:22.04
+   ```
+2. Install the universal database drivers:
+   ```bash
+   apt-get update && apt-get install -y freetds-bin
+   ```
+3. Connect natively using your configuration parameters:
+   ```bash
+   tsql -S finflow-sqlserver -p 1433 -U sa -P "Password123"
+   ```
+4. Change context and run verification tracking routines:
+   ```sql
+   USE finflow;
+   GO
+   SELECT * FROM accounts;
+   GO
+   ``
+
 ### Step 2: System Compilation
 Execute the clean build lifecycles using your local terminal to pull down starter definitions and ensure syntax validations pass:
 ```powershell

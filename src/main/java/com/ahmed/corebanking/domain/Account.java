@@ -2,6 +2,8 @@ package com.ahmed.corebanking.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.type.descriptor.jdbc.VarcharJdbcType;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -17,6 +19,7 @@ public class Account {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @JdbcType(VarcharJdbcType.class) // Explicitly instructs Hibernate to process this UUID as a standard String
     @Column(columnDefinition = "VARCHAR(36)") // Forces Hibernate to map UUID to VARCHAR instead of uniqueidentifier
     private UUID id;
 
