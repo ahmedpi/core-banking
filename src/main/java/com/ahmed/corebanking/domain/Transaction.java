@@ -37,5 +37,5 @@ public class Transaction {
     private LocalDateTime timestamp;
 
     @Column(nullable = false)
-    private String status; //SUCCESS, FAILED
+    private TransactionStatus status; //SUCCESS, FAILED
 }
