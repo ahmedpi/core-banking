@@ -36,6 +36,7 @@ public class Transaction {
     @Column(nullable = false)
     private LocalDateTime timestamp;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private TransactionStatus status; //SUCCESS, FAILED
+    private TransactionStatus status;
 }

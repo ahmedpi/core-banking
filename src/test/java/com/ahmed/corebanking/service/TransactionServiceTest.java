@@ -102,7 +102,7 @@ public class TransactionServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> {
             transferService.transferMoney(request);
-        }, "Should throw an exception because source account balance (100) is lower than transfer amount (10000)");
+        }, "Should throw an exception because source account balance (1000) is lower than transfer amount (10000)");
 
         verify(accountRepository, never()).save(any(Account.class));
         verify(transactionRepository, never()).save(any(Transaction.class));
