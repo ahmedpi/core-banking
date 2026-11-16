@@ -3,10 +3,12 @@ package com.ahmed.corebanking.domain;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.hibernate.type.descriptor.jdbc.VarcharJdbcType;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -33,8 +35,9 @@ public class Transaction {
     @Column(nullable = false)
     private BigDecimal amount;
 
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
     @Column(nullable = false)
-    private LocalDateTime timestamp;
+    private Instant timestamp;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

@@ -1,138 +1,164 @@
-# FinFlow: Mini Core-Banking Microservice
+# FinFlow: Event-Driven Core-Banking Microservice
 
-**FinFlow** is a modern, enterprise-ready banking transaction backend service built to process atomic, high-performance peer-to-peer (P2P) money transfers while maintaining an immutable historical ledger audit log. This project demonstrates a modern Java architectures following strict production-grade patterns.
+**FinFlow** is a modern, enterprise-grade banking transaction backend service engineered to process atomic,
+high-concurrency peer-to-peer (P2P) money transfers while guaranteeing reliable event delivery via the **Transactional
+Outbox Pattern** and **Apache Kafka**.
 
----
-
-## 🛠️ Tech Stack & Highlights
-
-*   **Java 21 Engine**: Leverages cutting-edge LTS capabilities including **Java Records** for immutable Data Transfer Objects (DTOs).
-*   **Spring Boot 4.x Framework**: Implements a structured **Controller-Service-Repository** clean architecture with full RESTful API exposure.
-*   **Database Evolution (Flyway)**: Utilizes version-controlled schema definitions, completely avoiding brittle auto-generation logic inside production boundaries.
-*   **Microsoft SQL Server Integration**: Connects dynamically to a containerized SQL Server relational layer via explicit JDBC configurations.
-*   **Multi-User Concurrency Guard**: Features explicit **Pessimistic Writing Locks** (`@Lock(LockModeType.PESSIMISTIC_WRITE)`) to eliminate double-spending, data racing, and balance anomalies.
-*   **ACID Compliance**: Enforces explicit transactional isolation parameters (`Isolation.REPEATABLE_READ`) to guarantee calculation boundaries and atomic safe-rollbacks on operational faults.
-*   **Robust Automated Testing**: Covered by automated unit testing suites built using **JUnit 5** and isolated dependency mocks with **Mockito**.
+This project demonstrates production-ready Java 21 and Spring Boot 4 architecture patterns designed for financial data
+integrity, high availability, and cloud-native scalability.
 
 ---
 
-## 🏛️ Domain Architecture Schema
+## 🛠️ Tech Stack & Architectural Highlights
 
-The application handles relational persistence via two highly optimized table mappings linked to a dedicated SQL Server container:
+* **Java 21 LTS & Spring Boot 4.x**: Clean layered architecture leveraging **Java Records** for immutable Data Transfer
+  Objects (DTOs) and domain event contracts.
+* **Multi-User Concurrency & Deadlock Prevention**:
+    * Explicit **Pessimistic Write Locks** (`@Lock(LockModeType.PESSIMISTIC_WRITE)`) prevent double-spending and lost
+      updates.
+    * **Deterministic Lexicographical Lock Ordering** sorts source and target account numbers prior to row acquisition,
+      eliminating circular database deadlocks under bidirectional concurrent load.
+* **ACID Compliance & UTC Precision**: Enforces `Isolation.REPEATABLE_READ` transactions with full rollback guarantees
+  and UTC `Instant` timestamps.
+* **Transactional Outbox Pattern**: Atomically persists `TransferCompletedEvent` records into an `outbox_events` table
+  within the same SQL transaction as the ledger update, preventing dual-write inconsistencies between SQL Server and
+  Kafka.
+* **Event-Driven Messaging (Apache Kafka 4 / KRaft)**:
+    * Dedicated scheduled outbox relay (`OutboxPublisherJob`) polls pending events and publishes them with `acks=all`
+      and idempotent producer guarantees, partitioned by `account_number` for strict per-account ordering.
+    * Environment-aware Spring Profiles (`default` for local Docker KRaft Kafka; `prod` for **`SASL_SSL` + `OAUTHBEARER`
+      ** client authentication).
+* **Database Evolution (Flyway)**: Version-controlled schema migrations (`V1`, `V2`) with Hibernate `ddl-auto=validate`
+  enforcement against Microsoft SQL Server 2022.
+* **Standardized API Error Handling (RFC 9457)**: Global `@RestControllerAdvice` returning structured `ProblemDetail`
+  payloads for domain exceptions (`AccountNotFoundException`, `InsufficientFundsException`).
+
+---
+
+## 🏛️ Domain & Outbox Architecture Schema
 
 ### 1. `accounts` Table
-Tracks user balances and incorporates a data entity version field to block structural conflict updates:
-*   `id` (`VARCHAR(36)`, Primary Key) - Locally generated UUID string coordinates.
-*   `account_number` (`VARCHAR(20)`, Unique, Indexed) - Public routing account string identifier.
-*   `owner_name` (`VARCHAR(255)`) - Account ownership holder registration metadata.
-*   `balance` (`DECIMAL(18,2)`) - Active fractional currency representation.
-*   `version` (`BIGINT`) - Hibernate concurrency tracker value.
+
+Tracks active account balances and concurrency metadata:
+
+* `id` (`VARCHAR(36)`, Primary Key) — UUID identifier.
+* `account_number` (`VARCHAR(20)`, Unique, Indexed) — Public routing account identifier.
+* `owner_name` (`VARCHAR(255)`) — Account holder metadata.
+* `balance` (`DECIMAL(18,2)`) — Active fractional currency balance.
+* `version` (`BIGINT`) — Optimistic concurrency tracker.
 
 ### 2. `transactions` Table
-An immutable accounting audit ledger designed to preserve tracking accountability:
-*   `id` (`VARCHAR(36)`, Primary Key) - Distinct tracking transaction receipt code string.
-*   `source_account_number` (`VARCHAR(20)`) - Originating account source routing.
-*   `target_account_number` (`VARCHAR(20)`) - Destination account credit target.
-*   `amount` (`DECIMAL(18,2)`) - Transferred currency absolute value.
-*   `timestamp` (`DATETIME2`) - Precise ISO execution clock capture.
-*   `status` (`VARCHAR(50)`) - State engine checkpoint (e.g., `SUCCESS`, `FAILED`).
+
+Immutable accounting audit ledger:
+
+* `id` (`VARCHAR(36)`, Primary Key) — Transaction receipt UUID.
+* `source_account_number` (`VARCHAR(20)`) — Originating account routing number.
+* `target_account_number` (`VARCHAR(20)`) — Destination account routing number.
+* `amount` (`DECIMAL(18,2)`) — Transferred currency value.
+* `timestamp` (`DATETIME2`) — UTC execution timestamp.
+* `status` (`VARCHAR(50)`) — Execution state (`SUCCESS`, `FAILED`).
+
+### 3. `outbox_events` Table
+
+Transactional event staging log ensuring at-least-once Kafka delivery:
+
+* `id` (`VARCHAR(36)`, Primary Key) — Outbox event UUID.
+* `aggregate_type` (`VARCHAR(50)`) — Domain aggregate category (e.g., `ACCOUNT`).
+* `aggregate_id` (`VARCHAR(36)`) — Kafka partition key (`source_account_number`).
+* `event_type` (`VARCHAR(100)`) — Event schema identifier (`TransferCompletedEvent`).
+* `payload` (`NVARCHAR(MAX)`) — Serialized JSON event payload.
+* `status` (`VARCHAR(20)`) — Relay state (`PENDING`, `PUBLISHED`).
+* `created_at` / `published_at` (`DATETIME2`) — Lifecycle audit timestamps.
 
 ---
 
 ## 🚀 Local Installation & Quick Start
 
 ### Prerequisites
-Make sure your development machine has the following dependencies configured globally:
-*   **Java 21 JDK** (e.g., Eclipse Temurin, Oracle OpenJDK)
-*   **Apache Maven 3.9+**
-*   **Docker Desktop** (Engine running background processes)
 
-### Step 1: Clone and Infrastructure Boot up
-Navigate to your project path folder containing your `docker-compose.yml` file and start the Microsoft SQL Server database layer:
+* **Java 21 JDK** (Eclipse Temurin / OpenJDK)
+* **Apache Maven 3.9+**
+* **Docker Desktop**
+
+### Step 1: Start Infrastructure (SQL Server + Kafka KRaft)
+
+Launch Microsoft SQL Server 2022 (with automated database initialization) and Apache Kafka 3.9 (KRaft mode):
+
 ```powershell
 docker compose up -d
 ```
-Verify the container is active and listening on port `1433`:
+
+Verify containers are healthy and running:
+
 ```powershell
 docker ps
 ```
 
-### 🔍 Local Database Troubleshooting & Verification
-If your container environment lacks a default native client command path line utility, spin up an ad-hoc proxy container to query the relational engine:
+### Step 2: Run the Microservice
 
-1. Launch a network-bridged container instance:
-   ```powershell
-   docker run -it --rm --network core-banking_default ubuntu:22.04
-   ```
-2. Install the universal database drivers:
-   ```bash
-   apt-get update && apt-get install -y freetds-bin
-   ```
-3. Connect natively using your configuration parameters:
-   ```bash
-   tsql -S finflow-sqlserver -p 1433 -U sa -P "Password123"
-   ```
-4. Change context and run verification tracking routines:
-   ```sql
-   USE finflow;
-   GO
-   SELECT * FROM accounts;
-   GO
-   ``
+Flyway automatically applies all SQL migrations on startup and starts the Outbox Relay Scheduler:
 
-### Step 2: System Compilation
-Execute the clean build lifecycles using your local terminal to pull down starter definitions and ensure syntax validations pass:
-```powershell
-mvn clean compile
-```
-
-### Step 3: Run the Application Server
-Launch the Spring Boot microservice environment. Flyway will automatically catch the startup lifecycle, provision the `finflow` catalog database, apply the SQL migrations, and bind the embedded server onto port `8080`:
 ```powershell
 mvn spring-boot:run
 ```
+
+*(To activate production OAuth2 Kafka security settings, run with `-Dspring-boot.run.profiles=prod` and
+configure `KAFKA_CLIENT_ID`, `KAFKA_CLIENT_SECRET`, and `OAUTH_TOKEN_URI`.)*
 
 ---
 
 ## 🌐 REST API Specifications
 
-### 💳 Execute Peer-to-Peer Transfer
-*   **Endpoint:** `POST /api/v1/transfers`
-*   **Content-Type:** `application/json`
+### Execute Peer-to-Peer Transfer
 
-#### Request Payload Body Example:
+* **Endpoint:** `POST /api/v1/transfers`
+* **Content-Type:** `application/json`
+
+#### Request Payload:
+
 ```json
 {
-    "sourceAccountNumber": "ACC123",
-    "targetAccountNumber": "ACC456",
-    "amount": 250.50
+  "sourceAccountNumber": "ACC123",
+  "targetAccountNumber": "ACC456",
+  "amount": 100.00
 }
 ```
 
-#### Successful Response JSON Output (`200 OK`):
+#### Successful Response (`200 OK`):
+
 ```json
 {
-    "id": "e2c34a1b-7d8e-90f1-23a4-56b7c8d9e0f1",
-    "sourceAccountNumber": "ACC123",
-    "targetAccountNumber": "ACC456",
-    "amount": 250.50,
-    "timestamp": "2026-10-31T22:15:30.12456",
-    "status": "SUCCESS"
+  "id": "10460c62-5914-455c-add2-3fef0f1ecbf8",
+  "sourceAccountNumber": "ACC123",
+  "targetAccountNumber": "ACC456",
+  "amount": 100.00,
+  "timestamp": "2026-11-16T16:03:04.177442800Z",
+  "status": "SUCCESS"
 }
 ```
 
 ---
 
-## 🧪 Testing and Quality Control
+## 🔍 Local Verification (Database & Kafka)
 
-The service business layer is fully isolated and verified via structural test coverage rules. To run your unified unit test validation suite using **JUnit 5** and **Mockito**, execute:
+### Verify Outbox Relay Status in SQL Server
+
+```powershell
+docker exec -it finflow-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Password123" -C -d finflow -Q "SELECT id, aggregate_id, event_type, status, published_at FROM outbox_events;"
+```
+
+### Consume Published Events from Kafka
+
+```powershell
+docker exec -it finflow-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic finflow.transfers.completed --from-beginning
+```
+
+---
+
+## 🧪 Testing
+
+Run the JUnit 5 & Mockito unit test suite:
 
 ```powershell
 mvn clean test
 ```
-
-### Verified Scenarios:
-1.  `shouldExecuteTransferSuccessfully`: Assures balances are deducted from source and credited to targets atomically while writing a clean transaction row tracking audit.
-2.  `shouldThrowExceptionWhenFundsAreInsufficient`: Validates that balance safety thresholds are blocked, preventing overdrafts and verifying that ledger updates are never committed to the database.
-
----

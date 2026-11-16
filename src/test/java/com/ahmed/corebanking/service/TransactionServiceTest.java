@@ -13,7 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -65,7 +65,7 @@ public class TransactionServiceTest {
                 "acc1",
                 "acc2",
                 BigDecimal.valueOf(100),
-                LocalDateTime.now(),
+                Instant.now(),
                 TransactionStatus.SUCCESS
         );
 

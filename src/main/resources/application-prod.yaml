@@ -1,0 +1,15 @@
+spring:
+  jpa:
+    show-sql: false
+
+  kafka:
+    properties:
+      security.protocol: SASL_SSL
+      sasl.mechanism: OAUTHBEARER
+      sasl.login.callback.handler.class: org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler
+      sasl.oauthbearer.token.endpoint.url: ${OAUTH_TOKEN_URI}
+      sasl.jaas.config: >
+        org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required
+        clientId="${KAFKA_CLIENT_ID}"
+        clientSecret="${KAFKA_CLIENT_SECRET}"
+        scope="kafka.write kafka.read";
