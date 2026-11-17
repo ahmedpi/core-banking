@@ -24,7 +24,7 @@ public class OutboxPublisherJob {
     private final OutboxEventRepository outboxRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
 
-    @Scheduled(fixedDelayString = "${finflow.outbox.poll-interval-ms:500}")
+    @Scheduled(fixedDelayString = "${finflow.outbox.poll-interval-ms:3000}")
     @Transactional
     public void publishPendingEvents() {
         log.debug("Polling outbox_events table for PENDING events...");

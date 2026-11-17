@@ -141,19 +141,25 @@ configure `KAFKA_CLIENT_ID`, `KAFKA_CLIENT_SECRET`, and `OAUTH_TOKEN_URI`.)*
 
 ## 🔍 Local Verification (Database & Kafka)
 
-### Verify Outbox Relay Status in SQL Server
+### 1. Verify Outbox Relay Status in SQL Server
 
 ```powershell
 docker exec -it finflow-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Password123" -C -d finflow -Q "SELECT id, aggregate_id, event_type, status, published_at FROM outbox_events;"
 ```
 
-### Consume Published Events from Kafka
+### 2. Inspect Messages via Kafka UI (Browser)
+
+Open **`http://localhost:8090`** in your browser to inspect the `finflow-local` cluster:
+1. Navigate to **Topics** -> **`finflow.transfers.completed`** (auto-created upon the first transfer).
+2. Open the **Messages** tab to inspect partition keys (`ACC123`), timestamps, and formatted JSON payloads.
+
+### 3. Consume Published Events via Kafka CLI (Terminal)
+
+To stream messages directly from the Kafka container with partition keys and timestamps:
 
 ```powershell
-docker exec -it finflow-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic finflow.transfers.completed --from-beginning
+docker exec -it finflow-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic finflow.transfers.completed --from-beginning --property print.key=true --property key.separator=" | " --property print.timestamp=true
 ```
-
----
 
 ## 🧪 Testing
 
@@ -162,3 +168,15 @@ Run the JUnit 5 & Mockito unit test suite:
 ```powershell
 mvn clean test
 ```
+
+## 🗺️ Production Roadmap (Next Steps)
+
+### Phase 2: Spring AI Real-Time Anomaly & Fraud Consumer
+* **LLM Integration (`Spring AI`)**: Configure `ChatClient` (supporting local **Ollama** in Docker or **OpenAI** `gpt-4o-mini`) with structured output mapping into an immutable `FraudAssessment` Java Record.
+* **Asynchronous Fraud Scoring (`TransactionAnomalyConsumer`)**: Consume events from `finflow.transfers.completed` with manual offset commits (`ack-mode: manual`), evaluate 1-hour account velocity and structuring patterns, and persist high-risk alerts (`riskScore >= 75`) into `fraud_alerts` with consumer-side idempotency guards.
+* **Resilient Error Handling (`@RetryableTopic` & DLT)**: Configure non-blocking retry topics and a Dead Letter Topic (`finflow.transfers.completed-dlt`) so transient LLM timeouts never stall valid transactions.
+
+### Phase 3: API Hardening & Cloud-Native Readiness
+* **Idempotency Keys**: Enforce a client-generated `Idempotency-Key` HTTP header on `POST /api/v1/transfers` to prevent duplicate transfers during network retries.
+* **Security & OpenAPI Documentation**: Add **Spring Security (OAuth2 Resource Server / JWT)** for downstream API Gateway validation and **Springdoc OpenAPI / Swagger UI** (`/swagger-ui.html`).
+* **Multi-Threaded Integration Testing (`Testcontainers`)**: Add automated JUnit 5 integration tests spinning up containerized SQL Server and Kafka instances to verify bidirectional concurrency (`ACC123 <-> ACC456`) and outbox-to-consumer delivery end-to-end.
