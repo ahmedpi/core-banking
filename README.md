@@ -171,12 +171,16 @@ mvn clean test
 
 ## 🗺️ Production Roadmap (Next Steps)
 
-### Phase 2: Spring AI Real-Time Anomaly & Fraud Consumer
-* **LLM Integration (`Spring AI`)**: Configure `ChatClient` (supporting local **Ollama** in Docker or **OpenAI** `gpt-4o-mini`) with structured output mapping into an immutable `FraudAssessment` Java Record.
-* **Asynchronous Fraud Scoring (`TransactionAnomalyConsumer`)**: Consume events from `finflow.transfers.completed` with manual offset commits (`ack-mode: manual`), evaluate 1-hour account velocity and structuring patterns, and persist high-risk alerts (`riskScore >= 75`) into `fraud_alerts` with consumer-side idempotency guards.
-* **Resilient Error Handling (`@RetryableTopic` & DLT)**: Configure non-blocking retry topics and a Dead Letter Topic (`finflow.transfers.completed-dlt`) so transient LLM timeouts never stall valid transactions.
+### Phase 2: Automated Integration & Concurrency Verification (`Testcontainers`)
+* **Containerized Infrastructure**: Spin up ephemeral **Microsoft SQL Server 2022** and **Apache Kafka 3.9 (KRaft)** instances via JUnit 5 `@Testcontainers` with automatic Flyway migration execution.
+* **Bidirectional Concurrency Stress Suite**: Execute multi-threaded transfers (`ACC123 <-> ACC456`) synchronized via `CountDownLatch` to prove deterministic lock ordering prevents deadlocks and double-spending under high load.
+* **End-to-End Outbox Verification**: Assert atomic ledger-to-outbox persistence, rollback integrity on insufficient funds, and asynchronous relay delivery to `finflow.transfers.completed` using **Awaitility**.
 
-### Phase 3: API Hardening & Cloud-Native Readiness
-* **Idempotency Keys**: Enforce a client-generated `Idempotency-Key` HTTP header on `POST /api/v1/transfers` to prevent duplicate transfers during network retries.
-* **Security & OpenAPI Documentation**: Add **Spring Security (OAuth2 Resource Server / JWT)** for downstream API Gateway validation and **Springdoc OpenAPI / Swagger UI** (`/swagger-ui.html`).
-* **Multi-Threaded Integration Testing (`Testcontainers`)**: Add automated JUnit 5 integration tests spinning up containerized SQL Server and Kafka instances to verify bidirectional concurrency (`ACC123 <-> ACC456`) and outbox-to-consumer delivery end-to-end.
+### Phase 3: Resilient Event Consumption & Spring AI Anomaly Detection
+* **Resilient Kafka Consumer (`TransactionAnomalyConsumer`)**: Consume `TransferCompletedEvent` messages with manual offset commits (`ack-mode: manual`), non-blocking retry topics (`@RetryableTopic`), and Dead Letter Topic (`finflow.transfers.completed-dlt`) routing.
+* **Consumer Idempotency & Velocity Context**: Persist alerts into a Flyway-managed `fraud_alerts` table (`V3`) with unique transaction constraints while querying 1-hour account transfer velocity to enrich risk evaluation.
+* **LLM Risk Scoring (`Spring AI`)**: Integrate `ChatClient` (backed by local **Ollama** in Docker Compose or **OpenAI**) with structured output mapping into an immutable `FraudAssessment` Java Record (`riskScore >= 75` triggers high-risk alerts).
+
+### Phase 4: API Hardening & Cloud-Native Readiness
+* **HTTP Idempotency Keys**: Enforce a client-generated `Idempotency-Key` header on `POST /api/v1/transfers` backed by a `V4` persistence table to return cached receipts on network retries and reject payload mismatches (`409 Conflict`).
+* **Security, OpenAPI & Observability**: Add **Spring Security (OAuth2 Resource Server / JWT)** via a dedicated security profile, interactive **Springdoc OpenAPI / Swagger UI** (`/swagger-ui.html`), and **Actuator / Prometheus** metrics for outbox lag monitoring.

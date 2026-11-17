@@ -3,14 +3,18 @@ package com.ahmed.corebanking.service;
 import com.ahmed.corebanking.domain.Account;
 import com.ahmed.corebanking.domain.Transaction;
 import com.ahmed.corebanking.domain.TransactionStatus;
+import com.ahmed.corebanking.exceptions.InsufficientFundsException;
 import com.ahmed.corebanking.repository.AccountRepository;
+import com.ahmed.corebanking.repository.OutboxEventRepository;
 import com.ahmed.corebanking.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,6 +32,12 @@ public class TransactionServiceTest {
 
     @Mock
     private AccountRepository accountRepository;
+
+    @Mock
+    private OutboxEventRepository outboxEventRepository;
+
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     // 2. Automatically instantiate TransferService and inject the mocked repositories into it
     @InjectMocks
@@ -100,7 +110,7 @@ public class TransactionServiceTest {
         when(accountRepository.findByAccountNumberWithLock("acc1")).thenReturn(Optional.of(sourceAccount));
         when(accountRepository.findByAccountNumberWithLock("acc2")).thenReturn(Optional.of(targetAccount));
 
-        assertThrows(IllegalArgumentException.class, () -> {
+        assertThrows(InsufficientFundsException.class, () -> {
             transferService.transferMoney(request);
         }, "Should throw an exception because source account balance (1000) is lower than transfer amount (10000)");
 
