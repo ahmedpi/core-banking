@@ -120,7 +120,12 @@ public class TransferIntegrationTest extends AbstractIntegrationTest {
             List<ConsumerRecord<String, String>> received = new ArrayList<>();
             await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(500));
-                records.forEach(received::add);
+                records.forEach(record -> {
+                    TransferCompletedEvent event = objectMapper.readValue(record.value(), TransferCompletedEvent.class);
+                    if (event.transactionId().equals(txId)) {
+                        received.add(record);
+                    }
+                });
                 assertThat(received.isEmpty()).isFalse();
             });
 
