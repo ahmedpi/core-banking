@@ -59,7 +59,15 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: finflow-kafka:29092
       DYNAMIC_CONFIG_ENABLED: "true"
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: finflow-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
 
 volumes:
   sqlserver_data:
   kafka_data:
+  ollama_data:
