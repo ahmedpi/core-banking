@@ -29,14 +29,14 @@ public class OutboxPublisherJob {
     public void publishPendingEvents() {
         log.debug("Polling outbox_events table for PENDING events...");
 
-        List<OutboxEvent> events = outboxRepository.findTop50ByStatusOrderByCreatedAtAsc(OutboxStatus.PENDING);
+        List<OutboxEvent> pendingEvents = outboxRepository.findTop50ByStatusOrderByCreatedAtAsc(OutboxStatus.PENDING);
 
-        if (events.isEmpty()) {
+        if (pendingEvents.isEmpty()) {
             log.debug("No pending outbox events found.");
             return;
         }
 
-        for (OutboxEvent event : events) {
+        for (OutboxEvent event : pendingEvents) {
             try {
                 log.debug("Publishing outbox event id={}, aggregateType={}, aggregateId={}, payload={}",
                         event.getId(), event.getAggregateType(), event.getAggregateId(), event.getPayload());
@@ -60,7 +60,7 @@ public class OutboxPublisherJob {
                 break;
             }
         }
-        outboxRepository.saveAll(events);
+        outboxRepository.saveAll(pendingEvents);
         log.debug("Finished outbox polling cycle.");
     }
 }

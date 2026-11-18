@@ -1,10 +1,12 @@
 package com.ahmed.corebanking.repository;
 
 import com.ahmed.corebanking.domain.Transaction;
+import com.ahmed.corebanking.domain.TransactionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,4 +19,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             "ORDER BY timestamp DESC",
             nativeQuery = true)
     List<Transaction> findRecentTransactions(@Param("accNum") String accountNumber, @Param("days") int days);
+
+    List<Transaction> findBySourceAccountNumberAndStatusAndTimestampAfter(
+            String sourceAccountNumber,
+            TransactionStatus status,
+            Instant since
+    );
 }
