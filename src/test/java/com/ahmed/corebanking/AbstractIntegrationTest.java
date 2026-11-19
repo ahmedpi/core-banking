@@ -13,6 +13,10 @@ import org.testcontainers.utility.DockerImageName;
 @TestPropertySource(properties = {"spring.ai.ollama.base-url=http://localhost:0", "spring.ai.ollama.init.pull-model-strategy=never", "spring.ai.retry.max-attempts=1"})
 public abstract class AbstractIntegrationTest {
 
+//    While SQL Server and Kafka run as real containers, this setup mocks OllamaChatModel with @MockitoBean
+//    and disables Ollama model pulls (pull-model-strategy=never).
+//    This avoids downloading gigabytes of LLM weights or waiting 10+ seconds per prompt during CI/CD test runs.
+
     @MockitoBean
     private OllamaChatModel ollamaChatModel;
 

@@ -2,8 +2,8 @@ package com.ahmed.corebanking.service;
 
 import com.ahmed.corebanking.domain.*;
 import com.ahmed.corebanking.domain.event.TransferCompletedEvent;
-import com.ahmed.corebanking.exceptions.AccountNotFoundException;
-import com.ahmed.corebanking.exceptions.InsufficientFundsException;
+import com.ahmed.corebanking.domain.exception.AccountNotFoundException;
+import com.ahmed.corebanking.domain.exception.InsufficientFundsException;
 import com.ahmed.corebanking.repository.AccountRepository;
 import com.ahmed.corebanking.repository.OutboxEventRepository;
 import com.ahmed.corebanking.repository.TransactionRepository;
@@ -17,7 +17,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor

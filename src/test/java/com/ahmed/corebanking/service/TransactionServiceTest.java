@@ -3,7 +3,7 @@ package com.ahmed.corebanking.service;
 import com.ahmed.corebanking.domain.Account;
 import com.ahmed.corebanking.domain.Transaction;
 import com.ahmed.corebanking.domain.TransactionStatus;
-import com.ahmed.corebanking.exceptions.InsufficientFundsException;
+import com.ahmed.corebanking.domain.exception.InsufficientFundsException;
 import com.ahmed.corebanking.repository.AccountRepository;
 import com.ahmed.corebanking.repository.OutboxEventRepository;
 import com.ahmed.corebanking.repository.TransactionRepository;

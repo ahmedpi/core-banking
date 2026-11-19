@@ -1,4 +1,4 @@
-package com.ahmed.corebanking.exceptions;
+package com.ahmed.corebanking.domain.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -35,6 +35,13 @@ public class GlobalExceptionHandler {
         problem.setTitle("Invalid Transfer Request");
         problem.setType(URI.create("https://example.com"));
         problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ProblemDetail handleIdempotencyConflict(IdempotencyConflictException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        problem.setTitle("Idempotency Key Payload Mismatch");
         return problem;
     }
 }

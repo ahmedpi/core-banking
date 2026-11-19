@@ -1,11 +1,13 @@
 # FinFlow: Event-Driven Core-Banking Microservice
 
-**FinFlow** is a modern, enterprise-grade banking transaction backend service engineered to process atomic,
-high-concurrency peer-to-peer (P2P) money transfers while guaranteeing reliable event delivery via the **Transactional
-Outbox Pattern** and **Apache Kafka**.
+**FinFlow** is a modern, enterprise-grade core-banking transaction service engineered to process atomic,
+high-concurrency peer-to-peer (P2P) money transfers, guarantee reliable event delivery via the **Transactional Outbox
+Pattern** and **Apache Kafka**, and perform **real-time AI-powered fraud risk scoring** using **Spring AI** and local
+**Ollama** LLMs with automatic deterministic rule-based fallback.
 
-This project demonstrates production-ready Java 21 and Spring Boot 4 architecture patterns designed for financial data
-integrity, high availability, and cloud-native scalability.
+This project demonstrates production-ready **Java 21**, **Spring Boot 4**, and **Spring AI 2** architecture patterns
+designed for financial data integrity, fault-tolerant event processing, structured LLM evaluation, and cloud-native
+scalability.
 
 ---
 
