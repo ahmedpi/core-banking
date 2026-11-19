@@ -24,6 +24,10 @@ public class SpringAiFraudRiskEvaluator implements FraudRiskEvaluator {
               1-hour transfer count >= 5, 1-hour cumulative transfer volume >= $10,000.00, or rapid structuring.
             
             Provide a concise, objective 1-2 sentence explanation in the reasoning field.
+            
+            Respond ONLY with a single JSON object matching this exact structure (all 3 fields are mandatory and non-null):
+            {"riskScore": 85, "riskLevel": "HIGH", "reasoning": "Account initiated 8 transfers within 1 hour, exceeding normal velocity."}
+            
             """;
 
     private final ChatClient chatClient;
@@ -68,6 +72,7 @@ public class SpringAiFraudRiskEvaluator implements FraudRiskEvaluator {
                     .entity(FraudAssessment.class);
 
             if (assessment == null || assessment.riskLevel() == null || assessment.reasoning() == null) {
+                log.debug("Incomplete assessment payload from LLM: {}", assessment);
                 throw new IllegalStateException("LLM returned an incomplete FraudAssessment payload");
             }
 

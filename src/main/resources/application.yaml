@@ -43,24 +43,25 @@ spring:
       thread-name-prefix: finflow-scheduler-
 
   ai:
+    retry:
+      max-attempts: 1 # Fail fast to RuleBasedFraudRiskEvaluator instead of blocking Kafka
     ollama:
       base-url: http://localhost:11434
       chat:
-        model: llama3.2
         options:
+          model: llama3.2
           temperature: 0.1
           format: json
+          keep-alive: 10m
       init:
         pull-model-strategy: when_missing
+  http:
+    clients:
+      connect-timeout: 10s
+      read-timeout: 60s
+      imperative:
+        factory: jdk
 
 logging:
   level:
     com.ahmed.corebanking: DEBUG
-#  ai:
-#    openai:
-#      api-key: ${OPENAI_API_KEY}
-#      chat:
-#        options:
-#          model: gpt-4o-mini
-#          temperature: 0.1 # Low temperature for deterministic structured risk scoring
-
