@@ -4,6 +4,7 @@ import com.ahmed.corebanking.domain.*;
 import com.ahmed.corebanking.domain.event.TransferCompletedEvent;
 import com.ahmed.corebanking.domain.exception.AccountNotFoundException;
 import com.ahmed.corebanking.domain.exception.InsufficientFundsException;
+import com.ahmed.corebanking.dto.TransferRequest;
 import com.ahmed.corebanking.repository.AccountRepository;
 import com.ahmed.corebanking.repository.OutboxEventRepository;
 import com.ahmed.corebanking.repository.TransactionRepository;

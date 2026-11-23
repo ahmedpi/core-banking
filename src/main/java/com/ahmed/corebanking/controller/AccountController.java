@@ -1,8 +1,9 @@
 package com.ahmed.corebanking.controller;
 
 import com.ahmed.corebanking.domain.Transaction;
+import com.ahmed.corebanking.dto.TransferRequest;
+import com.ahmed.corebanking.dto.TransferResponse;
 import com.ahmed.corebanking.service.IdempotentTransferService;
-import com.ahmed.corebanking.service.TransferRequest;
 import com.ahmed.corebanking.service.TransferService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,13 +22,13 @@ public class AccountController {
      * Maps incoming JSON payloads to Record DTO.
      */
     @PostMapping
-    public ResponseEntity<Transaction> createTransfer(
+    public ResponseEntity<TransferResponse> createTransfer(
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody TransferRequest request) {
 
         if (idempotencyKey == null) {
             Transaction transactionLedger = transferService.transferMoney(request);
-            return ResponseEntity.ok(transactionLedger);
+            return ResponseEntity.ok(TransferResponse.from(transactionLedger));
         }
 
         String trimmedKey = idempotencyKey.trim();
@@ -42,6 +43,6 @@ public class AccountController {
             responseBuilder.header("Idempotency-Replayed", "true");
         }
 
-        return responseBuilder.body(result.transaction());
+        return responseBuilder.body(TransferResponse.from(result.transaction()));
     }
 }

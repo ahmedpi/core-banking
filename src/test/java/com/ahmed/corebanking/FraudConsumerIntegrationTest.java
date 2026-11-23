@@ -5,7 +5,7 @@ import com.ahmed.corebanking.repository.AccountRepository;
 import com.ahmed.corebanking.repository.FraudAlertRepository;
 import com.ahmed.corebanking.repository.OutboxEventRepository;
 import com.ahmed.corebanking.repository.TransactionRepository;
-import com.ahmed.corebanking.service.TransferRequest;
+import com.ahmed.corebanking.dto.TransferRequest;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

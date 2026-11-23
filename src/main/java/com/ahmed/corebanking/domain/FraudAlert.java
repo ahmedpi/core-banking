@@ -1,5 +1,6 @@
 package com.ahmed.corebanking.domain;
 
+import com.ahmed.corebanking.dto.FraudAssessment;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -33,8 +34,9 @@ public class FraudAlert {
     @Column(name = "risk_score", nullable = false)
     private int riskScore;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "risk_level", nullable = false, length = 20)
-    private String riskLevel;
+    private FraudAssessment.RiskLevel riskLevel;
 
     @Column(nullable = false, columnDefinition = "NVARCHAR(1000)")
     private String reasoning;

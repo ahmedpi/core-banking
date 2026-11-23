@@ -1,4 +1,4 @@
-package com.ahmed.corebanking.service;
+package com.ahmed.corebanking.dto;
 
 import java.math.BigDecimal;
 

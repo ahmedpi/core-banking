@@ -53,6 +53,8 @@ spring:
           temperature: 0.1
           format: json
           keep-alive: 10m
+          num-predict: 120   # Hard cap on output tokens (prevents runaway JSON generation)
+          num-ctx: 2048      # Shrinks KV-cache RAM usage (default is often 4096 or 8192)
       init:
         pull-model-strategy: when_missing
   http:

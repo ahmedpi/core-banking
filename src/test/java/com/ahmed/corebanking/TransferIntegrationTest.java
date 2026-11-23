@@ -8,7 +8,7 @@ import com.ahmed.corebanking.domain.event.TransferCompletedEvent;
 import com.ahmed.corebanking.repository.AccountRepository;
 import com.ahmed.corebanking.repository.OutboxEventRepository;
 import com.ahmed.corebanking.repository.TransactionRepository;
-import com.ahmed.corebanking.service.TransferRequest;
+import com.ahmed.corebanking.dto.TransferRequest;
 import com.ahmed.corebanking.service.TransferService;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

@@ -1,8 +1,9 @@
 package com.ahmed.corebanking.service;
 
+import com.ahmed.corebanking.config.FraudEvaluationProperties;
 import com.ahmed.corebanking.domain.Transaction;
-import com.ahmed.corebanking.domain.event.FraudAssessment;
 import com.ahmed.corebanking.domain.event.TransferCompletedEvent;
+import com.ahmed.corebanking.dto.FraudAssessment;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.context.annotation.Primary;
@@ -15,6 +16,9 @@ import java.util.List;
 @Service
 @Primary
 public class SpringAiFraudRiskEvaluator implements FraudRiskEvaluator {
+    private static final String ROUTINE_TRANSFER_REASON = "Routine low-value transfer";
+
+    // Static system prompt: maximizes prompt-prefix caching in Ollama & cloud APIs
     private static final String SYSTEM_PROMPT = """
             You are a senior financial fraud risk analyst for FinFlow core banking.
             Evaluate peer-to-peer (P2P) money transfers for anomaly and fraud risk using these scoring guidelines:
@@ -31,59 +35,93 @@ public class SpringAiFraudRiskEvaluator implements FraudRiskEvaluator {
             """;
 
     private final ChatClient chatClient;
-    private final RuleBasedFraudRiskEvaluator ruleBasedFallback;
+    private final RuleBasedFraudRiskEvaluator ruleBasedEvaluator;
+    private final FraudEvaluationProperties properties;
 
-    public SpringAiFraudRiskEvaluator(ChatClient.Builder chatClientBuilder, RuleBasedFraudRiskEvaluator ruleBasedFallback) {
+    public SpringAiFraudRiskEvaluator(ChatClient.Builder chatClientBuilder, RuleBasedFraudRiskEvaluator ruleBasedEvaluator, FraudEvaluationProperties properties) {
         this.chatClient = chatClientBuilder.build();
-        this.ruleBasedFallback = ruleBasedFallback;
+        this.ruleBasedEvaluator = ruleBasedEvaluator;
+        this.properties = properties;
     }
 
     @Override
-    public FraudAssessment evaluate(TransferCompletedEvent event, List<Transaction> recentHourlyTransfers) {
+    public FraudAssessment evaluate(TransferCompletedEvent currentEvent, List<Transaction> recentHourlyTransfers) {
         int txCount = recentHourlyTransfers.size();
+        // 1. Fast-path: Skip both rules and AI for trivial transfers
+        if (properties.isRoutine(currentEvent.amount(), txCount)) {
+            return new FraudAssessment(
+                    properties.trivialDefaultRiskScore(),
+                    FraudAssessment.RiskLevel.LOW,
+                    ROUTINE_TRANSFER_REASON
+            );
+        }
+
+        // 2. Run deterministic rules first; skip AI if rules already classify as clear LOW or definitive HIGH
+        FraudAssessment ruleAssessment = ruleBasedEvaluator.evaluate(currentEvent, recentHourlyTransfers);
+        if (!properties.requiresAiReview(ruleAssessment.riskScore())) {
+            log.debug("Skipping AI evaluation for txId={}, deterministic rule score={}",
+                    currentEvent.transactionId(), ruleAssessment.riskScore());
+            return ruleAssessment;
+        }
+
+        // 3. Invoke Ollama only for ambiguous MEDIUM-risk cases
+        return evaluateWithLlm(currentEvent, recentHourlyTransfers, txCount, ruleAssessment);
+    }
+
+    private FraudAssessment evaluateWithLlm(
+            TransferCompletedEvent currentEvent,
+            List<Transaction> recentHourlyTransfers,
+            int txCount,
+            FraudAssessment fallbackAssessment) {
+
         BigDecimal hourlyVolume = recentHourlyTransfers.stream()
                 .map(Transaction::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        String userPrompt = String.format("""
-                        Evaluate the following completed transfer:
-                        - Transaction ID: %s
-                        - Source Account: %s
-                        - Target Account: %s
-                        - Amount: $%s
-                        - Timestamp (UTC): %s
-                        - Sender 1-Hour Completed Transfers: %d
-                        - Sender 1-Hour Cumulative Volume: $%s
-                        """,
-                event.transactionId(),
-                event.sourceAccountNumber(),
-                event.targetAccountNumber(),
-                event.amount(),
-                event.timestamp(),
+        String userPrompt = """
+                Evaluate the following completed transfer:
+                - Transaction ID: %s
+                - Source Account: %s
+                - Target Account: %s
+                - Amount: $%s
+                - Timestamp (UTC): %s
+                - Sender 1-Hour Completed Transfers: %d
+                - Sender 1-Hour Cumulative Volume: $%s
+                """.formatted(
+                currentEvent.transactionId(),
+                currentEvent.sourceAccountNumber(),
+                currentEvent.targetAccountNumber(),
+                currentEvent.amount(),
+                currentEvent.timestamp(),
                 txCount,
                 hourlyVolume
         );
 
         try {
             FraudAssessment assessment = chatClient.prompt()
-                    .system(SYSTEM_PROMPT)
                     .user(userPrompt)
                     .call()
                     .entity(FraudAssessment.class);
 
-            if (assessment == null || assessment.riskLevel() == null || assessment.reasoning() == null) {
-                log.debug("Incomplete assessment payload from LLM: {}", assessment);
+            if (isIncomplete(assessment)) {
                 throw new IllegalStateException("LLM returned an incomplete FraudAssessment payload");
             }
 
             log.info("AI Fraud Assessment completed for txId={}: score={}, level={}",
-                    event.transactionId(), assessment.riskScore(), assessment.riskLevel());
+                    currentEvent.transactionId(), assessment.riskScore(), assessment.riskLevel());
 
             return assessment;
         } catch (Exception ex) {
             log.warn("Spring AI risk evaluation failed for txId={}, falling back to deterministic rules: {}",
-                    event.transactionId(), ex.getMessage());
-            return ruleBasedFallback.evaluate(event, recentHourlyTransfers);
+                    currentEvent.transactionId(), ex.getMessage());
+            return fallbackAssessment;
         }
+    }
+
+    private boolean isIncomplete(FraudAssessment assessment) {
+        return assessment == null
+                || assessment.riskScore() == null
+                || assessment.riskLevel() == null
+                || assessment.reasoning() == null;
     }
 }

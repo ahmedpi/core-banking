@@ -1,8 +1,9 @@
 package com.ahmed.corebanking.service;
 
+import com.ahmed.corebanking.config.FraudEvaluationProperties;
 import com.ahmed.corebanking.domain.Transaction;
-import com.ahmed.corebanking.domain.event.FraudAssessment;
 import com.ahmed.corebanking.domain.event.TransferCompletedEvent;
+import com.ahmed.corebanking.dto.FraudAssessment;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +35,8 @@ public class SpringAiFraudRiskEvaluatorTest {
     @Mock
     private RuleBasedFraudRiskEvaluator ruleBasedFraudRiskEvaluator;
 
+    private FraudEvaluationProperties properties;
+
     private SpringAiFraudRiskEvaluator springAiFraudRiskEvaluator;
 
     @BeforeEach
@@ -44,13 +47,13 @@ public class SpringAiFraudRiskEvaluatorTest {
                 .thenReturn(OllamaChatOptions.builder().build());
 
         ChatClient.Builder chatCliientBuilder = ChatClient.builder(chatModel);
-        springAiFraudRiskEvaluator = new SpringAiFraudRiskEvaluator(chatCliientBuilder, ruleBasedFraudRiskEvaluator);
+        springAiFraudRiskEvaluator = new SpringAiFraudRiskEvaluator(chatCliientBuilder, ruleBasedFraudRiskEvaluator, properties);
     }
 
     @Test
     @DisplayName("Should return structured FraudAssessment from ChatClient without invoking rule-based fallback")
     void shouldReturnAiFraudAssessmentAndSkipFallbackWhenLlmSucceeds() {
-        FraudAssessment assessment = new FraudAssessment(92, "HIGH", "AI detected anomaly");
+        FraudAssessment assessment = new FraudAssessment(92, FraudAssessment.RiskLevel.HIGH, "AI detected anomaly");
         Mockito.when(chatModel.call(Mockito.any(Prompt.class)))
                 .thenReturn(new ChatResponse(
                         List.of(new Generation(new AssistantMessage(
@@ -73,7 +76,7 @@ public class SpringAiFraudRiskEvaluatorTest {
 
         TransferCompletedEvent eventPayload = createSampleEvent();
         List<Transaction> recentHourlyTransfers = Collections.emptyList();
-        FraudAssessment fallbackAssessment = new FraudAssessment(92, "HIGH", "AI detected anomaly");
+        FraudAssessment fallbackAssessment = new FraudAssessment(92, FraudAssessment.RiskLevel.HIGH, "AI detected anomaly");
 
         Mockito.when(ruleBasedFraudRiskEvaluator.evaluate(eventPayload, recentHourlyTransfers)).thenReturn(fallbackAssessment);
 

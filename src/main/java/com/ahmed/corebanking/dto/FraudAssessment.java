@@ -1,4 +1,4 @@
-package com.ahmed.corebanking.domain.event;
+package com.ahmed.corebanking.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
@@ -10,9 +10,13 @@ public record FraudAssessment(
 
         @JsonProperty(required = true)
         @JsonPropertyDescription("Risk classification: must be exactly LOW, MEDIUM, or HIGH")
-        String riskLevel,
+        RiskLevel riskLevel,
 
         @JsonProperty(required = true)
         @JsonPropertyDescription("Concise 1-sentence explanation of why this score was assigned")
         String reasoning
-) {}
+) {
+    public enum RiskLevel {
+        LOW, MEDIUM, HIGH
+    }
+}

@@ -3,7 +3,7 @@ package com.ahmed.corebanking.infrastructure.messaging;
 import com.ahmed.corebanking.domain.FraudAlert;
 import com.ahmed.corebanking.domain.Transaction;
 import com.ahmed.corebanking.domain.TransactionStatus;
-import com.ahmed.corebanking.domain.event.FraudAssessment;
+import com.ahmed.corebanking.dto.FraudAssessment;
 import com.ahmed.corebanking.domain.event.TransferCompletedEvent;
 import com.ahmed.corebanking.repository.FraudAlertRepository;
 import com.ahmed.corebanking.repository.TransactionRepository;

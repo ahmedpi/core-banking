@@ -1,8 +1,8 @@
 package com.ahmed.corebanking.service;
 
 import com.ahmed.corebanking.domain.Transaction;
-import com.ahmed.corebanking.domain.event.FraudAssessment;
 import com.ahmed.corebanking.domain.event.TransferCompletedEvent;
+import com.ahmed.corebanking.dto.FraudAssessment;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -30,7 +30,7 @@ public class RuleBasedFraudRiskEvaluator implements FraudRiskEvaluator {
         if (highSingleAmount || highHourlyVolume || highVelocityCount) {
             return new FraudAssessment(
                     85,
-                    "HIGH",
+                    FraudAssessment.RiskLevel.HIGH,
                     String.format("High-risk transfer detected: amount=%s, 1h_tx_count=%d, 1h_volume=%s",
                             event.amount(), txCount, hourlyVolume)
             );
@@ -38,7 +38,7 @@ public class RuleBasedFraudRiskEvaluator implements FraudRiskEvaluator {
 
         return new FraudAssessment(
                 15,
-                "LOW",
+                FraudAssessment.RiskLevel.LOW,
                 "Normal transfer velocity and amount within expected baseline."
         );
     }
