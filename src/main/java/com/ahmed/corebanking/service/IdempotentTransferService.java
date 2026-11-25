@@ -43,7 +43,12 @@ public class IdempotentTransferService {
         try {
             return transactionTemplate.execute(status -> {
                 // Execute atomic ledger transfer + outbox persistence
-                Transaction transaction = transferService.transferMoney(request);
+                Transaction transaction = null;
+                try {
+                    transaction = transferService.transferMoney(request);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
 
                 Instant now = Instant.now();
                 IdempotencyRecord record = IdempotencyRecord.builder()

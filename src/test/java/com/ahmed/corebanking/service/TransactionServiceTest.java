@@ -65,7 +65,7 @@ public class TransactionServiceTest {
     }
 
     @Test
-    public void shouldExecuteTransferSuccessfully() {
+    public void shouldExecuteTransferSuccessfully() throws InterruptedException {
         BigDecimal transferAmount = BigDecimal.valueOf(100);
         // Arrange
         TransferRequest request = new TransferRequest("acc1", "acc2", transferAmount);

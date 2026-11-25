@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -69,12 +70,24 @@ public class TransferIntegrationTest extends AbstractIntegrationTest {
         transactionRepository.deleteAll();
         accountRepository.deleteAll();
 
+        // 1. Insert first target account (lands on Page 1)
         accountRepository.save(Account.builder()
                 .accountNumber("ACC123")
                 .ownerName("Alice")
                 .balance(new BigDecimal("10000.00"))
                 .build());
 
+        // 2. Pad the table with 500 dummy rows (~50KB+) to push ACC456 onto a separate 8KB SQL Server data page
+        List<Account> paddingAccounts = IntStream.range(0, 500)
+                .mapToObj(i -> Account.builder()
+                        .accountNumber(String.format("PAD%05d", i))
+                        .ownerName("Padding User " + i)
+                        .balance(new BigDecimal("100.00"))
+                        .build())
+                .toList();
+        accountRepository.saveAll(paddingAccounts);
+
+        // 3. Insert second target account (lands on a completely separate data page)
         accountRepository.save(Account.builder()
                 .accountNumber("ACC456")
                 .ownerName("Bob")
@@ -144,7 +157,7 @@ public class TransferIntegrationTest extends AbstractIntegrationTest {
         int totalTransfers = 100;
         int threadPoolSize = 40;
         ExecutorService executor = Executors.newFixedThreadPool(threadPoolSize);
-        CountDownLatch readyLatch = new CountDownLatch(totalTransfers);
+        CountDownLatch readyLatch = new CountDownLatch(threadPoolSize);
         CountDownLatch startLatch = new CountDownLatch(1);
         List<Future<ResponseEntity<String>>> futures = new ArrayList<>();
 

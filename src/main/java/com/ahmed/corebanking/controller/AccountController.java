@@ -24,7 +24,7 @@ public class AccountController {
     @PostMapping
     public ResponseEntity<TransferResponse> createTransfer(
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-            @RequestBody TransferRequest request) {
+            @RequestBody TransferRequest request) throws InterruptedException {
 
         if (idempotencyKey == null) {
             Transaction transactionLedger = transferService.transferMoney(request);

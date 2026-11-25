@@ -17,6 +17,9 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -33,7 +36,7 @@ public class TransferService {
      * Uses Isolation.REPEATABLE_READ to ensure balances remain stable mid-calculation.
      */
     @Transactional(isolation = Isolation.REPEATABLE_READ, rollbackFor = Exception.class)
-    public Transaction transferMoney(TransferRequest request) {
+    public Transaction transferMoney(TransferRequest request) throws InterruptedException {
 
         // 1. Structural business validation rules
         if (request.sourceAccountNumber().equals(request.targetAccountNumber())) {
@@ -44,27 +47,14 @@ public class TransferService {
             throw new IllegalArgumentException("Transfer amount must be greater than zero.");
         }
 
-        // 2. Deterministic lock ordering to prevent bidirectional deadlocks
-        // Sort the account numbers lexicographically before acquiring PESSIMISTIC_WRITE locks so
-        // both threads always lock ACC1 first, then ACC2.
-        String firstLockKey = request.sourceAccountNumber().compareTo(request.targetAccountNumber()) < 0
-                ? request.sourceAccountNumber()
-                : request.targetAccountNumber();
-        String secondLockKey = firstLockKey.equals(request.sourceAccountNumber())
-                ? request.targetAccountNumber()
-                : request.sourceAccountNumber();
-
-        Account firstAccount = lockAccountOrThrow(firstLockKey);
-        Account secondAccount = lockAccountOrThrow(secondLockKey);
-
-        Map<String, Account> lockedAccounts = Map.of(
-                firstAccount.getAccountNumber(), firstAccount,
-                secondAccount.getAccountNumber(), secondAccount
+        // 2. Acquire pessimistic write locks
+        Map<String, Account> lockedAccounts = lockAccountsInOrder(
+                request.sourceAccountNumber(),
+                request.targetAccountNumber()
         );
 
         Account sourceAccount = lockedAccounts.get(request.sourceAccountNumber());
         Account targetAccount = lockedAccounts.get(request.targetAccountNumber());
-
 
         // 3. Financial solvency check
         if (sourceAccount.getBalance().compareTo(request.amount()) < 0) {
@@ -94,6 +84,26 @@ public class TransferService {
         saveOutboxEvent(savedTransaction);
 
         return savedTransaction;
+    }
+
+    private Map<String, Account> lockAccountsInOrder(String sourceAccountNumber, String targetAccountNumber) throws InterruptedException {
+        // 2. Deterministic lock ordering to prevent bidirectional deadlocks
+        // Sort the account numbers lexicographically before acquiring PESSIMISTIC_WRITE locks so
+        // both threads always lock ACC1 first, then ACC2.
+
+        List<String> lockKeys = new ArrayList<>(List.of(sourceAccountNumber, targetAccountNumber));
+
+        Collections.sort(lockKeys);
+
+        Account firstAccount = lockAccountOrThrow(lockKeys.get(0));
+        Thread.sleep(10);
+        Account secondAccount = lockAccountOrThrow(lockKeys.get(1));
+
+        return Map.of(
+                firstAccount.getAccountNumber(), firstAccount,
+                secondAccount.getAccountNumber(), secondAccount
+        );
+
     }
 
     private Account lockAccountOrThrow(String accountNumber) {
