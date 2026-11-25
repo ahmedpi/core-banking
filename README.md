@@ -25,6 +25,7 @@ scalability.
 * **Transactional Outbox Pattern**: Atomically persists `TransferCompletedEvent` records into an `outbox_events` table
   within the same SQL transaction as the ledger update, preventing dual-write inconsistencies between SQL Server and
   Kafka.
+* **Tiered Hybrid Fraud Risk Evaluation**: Combines deterministic velocity and volume rules (`RuleBasedFraudRiskEvaluator`) with local **Ollama** LLM behavioral reasoning (`SpringAiFraudRiskEvaluator`) to balance low-latency alerting with deep contextual analysis.
 * **Event-Driven Messaging (Apache Kafka 4 / KRaft)**:
     * Dedicated scheduled outbox relay (`OutboxPublisherJob`) polls pending events and publishes them with `acks=all`
       and idempotent producer guarantees, partitioned by `account_number` for strict per-account ordering.
@@ -34,6 +35,24 @@ scalability.
   enforcement against Microsoft SQL Server 2022.
 * **Standardized API Error Handling (RFC 9457)**: Global `@RestControllerAdvice` returning structured `ProblemDetail`
   payloads for domain exceptions (`AccountNotFoundException`, `InsufficientFundsException`).
+
+---
+
+## 🛡️ Tiered Fraud Risk Scoring Engine
+
+Transfers are evaluated in real time against single-transaction amounts and 1-hour rolling account velocity metrics before deciding whether to short-circuit or invoke the local Ollama LLM:
+
+| Risk Tier | Base Score | Single Transfer Amount | 1-Hour Rolling Volume | 1-Hour Transfer Count | Routing & Action |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **HIGH** | `85` | `>= 5000.00` | `>= 10000.00` | `>= 5` transfers | Immediate deterministic alert persisted to `fraud_alerts` (bypasses LLM latency) |
+| **MEDIUM** | `55` | `1500.00` – `4999.99` | `4000.00` – `9999.99` | `3` – `4` transfers | Routed to local **Ollama** (`llama3.2`) for structured JSON behavioral analysis |
+| **LOW** | `15` | `< 1500.00` | `< 4000.00` | `< 3` transfers | Approved immediately as baseline activity |
+
+### Evaluation & Resilience Rules
+
+* **Top-Down Precedence:** Rules are evaluated strictly from `HIGH` to `LOW` using `>=` thresholds; triggering any single condition within a tier immediately assigns that risk level.
+* **Fail-Fast LLM Resilience (`max-attempts: 1`):** Spring AI is configured with single-attempt execution (`10s` connect timeout, `60s` read timeout) and bounded token generation (`num-predict: 120`, `num-ctx: 2048`, `temperature: 0.1`, `format: json`) so slow or unavailable inference never blocks the manual-acknowledgment Kafka consumer (`finflow-ai-fraud-detector`).
+* **Automatic Deterministic Fallback:** If the local **Ollama** instance (`http://localhost:11434`) is unreachable, times out, or fails structured JSON parsing during a `MEDIUM`-risk evaluation, the engine immediately falls back to `RuleBasedFraudRiskEvaluator` (`score: 55`, `level: MEDIUM`) and commits the Kafka offset safely without data loss.
 
 ---
 
@@ -107,8 +126,37 @@ mvn spring-boot:run
 *(To activate production OAuth2 Kafka security settings, run with `-Dspring-boot.run.profiles=prod` and
 configure `KAFKA_CLIENT_ID`, `KAFKA_CLIENT_SECRET`, and `OAUTH_TOKEN_URI`.)*
 
+### Step 3: Reset Database State (Optional)
+```powershell
+# 1. Force stop and delete the SQL Server container
+docker rm -f finflow-sqlserver
+
+# 2. Delete the named volume holding SQL Server data
+docker volume rm core-banking_sqlserver_data
+
+# 3. Recreate the container with a fresh, empty volume
+docker compose up -d
+```
+
 ---
 
+## ⚙️ Configuration & Environment Variables
+
+### Environment Overrides
+
+| Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `DB_USERNAME` | `SA` | SQL Server authentication username |
+| `DB_PASSWORD` | `Password123` | SQL Server authentication password |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Apache Kafka broker connection address |
+
+### Spring AI & Ollama Tuning (`application.yml`)
+
+* **Automatic Model Provisioning (`pull-model-strategy: when_missing`):** On startup, Spring AI checks the local Ollama instance (`http://localhost:11434`) and automatically pulls `llama3.2` if it is not yet cached. *(Note: The initial startup may take a few minutes depending on download speed while the model image is fetched.)*
+* **Deterministic & Memory-Bounded Inference:** Configured with `temperature: 0.1` and `format: json` for reliable structured output, alongside `num-predict: 120` (output token cap), `num-ctx: 2048` (reduced KV-cache RAM footprint), and `keep-alive: 10m` to prevent cold-start delays between bursts.
+* **Manual Kafka Acknowledgment:** Consumer group `finflow-ai-fraud-detector` runs with `enable-auto-commit: false` and `ack-mode: manual`, ensuring offsets are committed only after fraud evaluation and alert persistence succeed.
+
+---
 ## 🌐 REST API Specifications
 
 ### Execute Peer-to-Peer Transfer
